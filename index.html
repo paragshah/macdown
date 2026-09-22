@@ -4,12 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Markdown Viewer</title>
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <!-- Inline SVG favicon (reuses the brand mark) so no external request is made -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%234b6bfb' d='M14.85 3H1.15C.52 3 0 3.52 0 4.15v7.69C0 12.48.52 13 1.15 13h13.69c.64 0 1.15-.52 1.15-1.15v-7.7C16 3.52 15.48 3 14.85 3zM9 11H7V8L5.5 9.92 4 8v3H2V5h2l1.5 2L7 5h2v6zm2.99.5L9.5 8H11V5h2v3h1.5l-2.51 3.5z'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="style.css" />
-  <!-- Markdown + syntax highlighting (loaded from CDN) -->
-  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+  <!-- Markdown + syntax highlighting (bundled locally so the app works offline) -->
+  <script src="vendor/marked.min.js"></script>
+  <script src="vendor/purify.min.js"></script>
+  <script src="vendor/highlight.min.js"></script>
 </head>
 <body>
   <header class="topbar">
