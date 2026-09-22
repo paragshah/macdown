@@ -38,10 +38,20 @@
   // ---------- Marked config ----------
   // marked v12 dropped the built-in `highlight` option, so we highlight
   // each code block ourselves after rendering (see render()).
-  marked.setOptions({ gfm: true, breaks: false });
+  // Guard against a CDN lib that failed to load: without this, a top-level
+  // throw here would abort the whole script and leave a dead, blank page.
+  if (typeof marked !== "undefined") {
+    marked.setOptions({ gfm: true, breaks: false });
+  }
 
   // ---------- Rendering ----------
   function render(markdown, filename) {
+    // The renderer libs load from a CDN; on a cold first load one may not be
+    // ready yet. Bail with feedback instead of throwing into a blank page.
+    if (typeof marked === "undefined" || typeof DOMPurify === "undefined") {
+      showToast("Renderer still loading. Please refresh.");
+      return;
+    }
     const rawHtml = marked.parse(markdown);
     const clean = DOMPurify.sanitize(rawHtml, {
       USE_PROFILES: { html: true },
