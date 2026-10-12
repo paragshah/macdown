@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # mdview - open a Markdown file in the local Markdown Viewer web app.
 #
-# Usage: mdview <file.md>
+# Usage: mdview [file.md]
+#
+# With no argument, opens the first .md file (alphabetically) in the current
+# working directory.
 #
 # Starts a tiny static HTTP server rooted at the app directory, exposes the
 # target file to it via a temporary symlink, and opens the browser pointed at
@@ -22,12 +25,21 @@ done
 APP_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 PORT="${MDVIEW_PORT:-8753}"
 
-if [[ $# -lt 1 ]]; then
-  echo "Usage: mdview <file.md>" >&2
-  exit 1
+if [[ $# -ge 1 ]]; then
+  SRC="$1"
+else
+  shopt -s nullglob
+  MD_FILES=(*.md)
+  shopt -u nullglob
+  if [[ ${#MD_FILES[@]} -eq 0 ]]; then
+    echo "mdview: no .md file in $(pwd)" >&2
+    echo "Usage: mdview [file.md]" >&2
+    exit 1
+  fi
+  SRC="${MD_FILES[0]}"
+  echo "Opening $SRC"
 fi
 
-SRC="$1"
 if [[ ! -f "$SRC" ]]; then
   echo "mdview: no such file: $SRC" >&2
   exit 1
