@@ -2,14 +2,16 @@
 # mdview - open a Markdown file in the local Markdown Viewer web app.
 #
 # Usage: mdview [file.md]
+#        mdview --kill
 #
-# With no argument, opens the first .md file (alphabetically) in the current
-# working directory.
+# --kill stops the background server (silently does nothing if none is
+# running). With no argument, opens the first .md file (alphabetically) in the
+# current working directory, or the viewer's landing page if there is none.
 #
 # Starts a tiny static HTTP server rooted at the app directory, exposes the
 # target file to it via a temporary symlink, and opens the browser pointed at
 # index.html?src=<file>. The server runs in the background and detaches from
-# this terminal; the script prints its PID and the command to stop it.
+# this terminal; stop it with `mdview --kill`.
 
 set -euo pipefail
 
@@ -25,6 +27,12 @@ done
 APP_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 PORT="${MDVIEW_PORT:-8753}"
 
+if [[ "${1:-}" == "--kill" ]]; then
+  PIDS="$(lsof -ti tcp:"$PORT" -sTCP:LISTEN 2>/dev/null || true)"
+  [[ -n "$PIDS" ]] && kill $PIDS 2>/dev/null || true
+  exit 0
+fi
+
 if [[ $# -ge 1 ]]; then
   SRC="$1"
 else
@@ -32,30 +40,34 @@ else
   MD_FILES=(*.md)
   shopt -u nullglob
   if [[ ${#MD_FILES[@]} -eq 0 ]]; then
-    echo "mdview: no .md file in $(pwd)" >&2
-    echo "Usage: mdview [file.md]" >&2
+    SRC=""
+    echo "No .md file in $(pwd); opening the landing page"
+  else
+    SRC="${MD_FILES[0]}"
+    echo "Opening $SRC"
+  fi
+fi
+
+if [[ -z "$SRC" ]]; then
+  URL="http://localhost:$PORT/index.html"
+else
+  if [[ ! -f "$SRC" ]]; then
+    echo "mdview: no such file: $SRC" >&2
     exit 1
   fi
-  SRC="${MD_FILES[0]}"
-  echo "Opening $SRC"
+
+  ABS="$(cd "$(dirname "$SRC")" && pwd)/$(basename "$SRC")"
+
+  # Expose the file to the server via a symlink inside a dedicated subfolder.
+  DOCS_DIR="$APP_DIR/.mdview-docs"
+  mkdir -p "$DOCS_DIR"
+  LINK_NAME="$(basename "$SRC")"
+  ln -sf "$ABS" "$DOCS_DIR/$LINK_NAME"
+
+  # URL-encode the query value (spaces etc.) with python.
+  ENCODED="$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" ".mdview-docs/$LINK_NAME")"
+  URL="http://localhost:$PORT/index.html?src=$ENCODED"
 fi
-
-if [[ ! -f "$SRC" ]]; then
-  echo "mdview: no such file: $SRC" >&2
-  exit 1
-fi
-
-ABS="$(cd "$(dirname "$SRC")" && pwd)/$(basename "$SRC")"
-
-# Expose the file to the server via a symlink inside a dedicated subfolder.
-DOCS_DIR="$APP_DIR/.mdview-docs"
-mkdir -p "$DOCS_DIR"
-LINK_NAME="$(basename "$SRC")"
-ln -sf "$ABS" "$DOCS_DIR/$LINK_NAME"
-
-# URL-encode the query value (spaces etc.) with python.
-ENCODED="$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" ".mdview-docs/$LINK_NAME")"
-URL="http://localhost:$PORT/index.html?src=$ENCODED"
 
 # Start the server if it isn't already running on this port. Detach it fully
 # (nohup + disown) so it survives after this script returns to your prompt.
@@ -67,10 +79,10 @@ if ! curl -s -o /dev/null "http://localhost:$PORT/index.html" 2>/dev/null; then
   # Give it a moment to bind.
   sleep 0.5
   echo "Serving Markdown Viewer at http://localhost:$PORT (pid $SERVER_PID)"
-  echo "To stop it:  kill $SERVER_PID"
+  echo "To stop it:  mdview --kill"
 else
   echo "Reusing server already running at http://localhost:$PORT"
-  echo "To stop it:  kill \$(lsof -ti tcp:$PORT)"
+  echo "To stop it:  mdview --kill"
 fi
 
 open "$URL"
