@@ -45,7 +45,7 @@
   }
 
   // ---------- Rendering ----------
-  function render(markdown, filename) {
+  function render(markdown, filename, baseUrl) {
     // The renderer libs load from a CDN; on a cold first load one may not be
     // ready yet. Bail with feedback instead of throwing into a blank page.
     if (typeof marked === "undefined" || typeof DOMPurify === "undefined") {
@@ -58,6 +58,17 @@
       ADD_ATTR: ["target"],
     });
     output.innerHTML = clean;
+
+    // Rewrite relative image/video/source paths so they resolve against
+    // the original file's directory instead of the app root.
+    if (baseUrl) {
+      output.querySelectorAll("img[src], video[src], source[src]").forEach(function (el) {
+        var src = el.getAttribute("src");
+        if (src && !src.match(/^(https?:\/\/|data:|\/)/)) {
+          el.setAttribute("src", baseUrl + "/" + src);
+        }
+      });
+    }
 
     // Open external links in a new tab safely.
     output.querySelectorAll('a[href^="http"]').forEach(function (a) {
@@ -190,14 +201,19 @@
   (function loadFromQuery() {
     const src = new URLSearchParams(window.location.search).get("src");
     if (!src) return;
-    fetch(src)
+    fetch(src + (src.includes("?") ? "&" : "?") + "_t=" + Date.now())
       .then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.text();
       })
       .then(function (text) {
         const name = decodeURIComponent(src.split("/").pop());
-        render(text, name);
+        // Derive the base URL for resolving relative asset paths.
+        // The mdview script symlinks the source directory as .mdview-docs/_base.
+        var base = src.lastIndexOf("/") !== -1
+          ? src.substring(0, src.lastIndexOf("/")) + "/_base"
+          : null;
+        render(text, name, base);
       })
       .catch(function () {
         showToast("Could not load \"" + src + "\".");

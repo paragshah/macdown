@@ -58,15 +58,23 @@ else
 
   ABS="$(cd "$(dirname "$SRC")" && pwd)/$(basename "$SRC")"
 
-  # Expose the file to the server via a symlink inside a dedicated subfolder.
+  # Expose the file *and its parent directory* to the server via symlinks so
+  # that relative image/asset paths in the Markdown resolve correctly.
   DOCS_DIR="$APP_DIR/.mdview-docs"
   mkdir -p "$DOCS_DIR"
+  # Clean stale symlinks so the directory doesn't grow endlessly.
+  find "$DOCS_DIR" -maxdepth 1 -type l -delete 2>/dev/null || true
   LINK_NAME="$(basename "$SRC")"
   ln -sf "$ABS" "$DOCS_DIR/$LINK_NAME"
+  # Symlink the source file's directory as _base so relative assets are reachable.
+  SRC_DIR="$(cd "$(dirname "$ABS")" && pwd)"
+  ln -sfn "$SRC_DIR" "$DOCS_DIR/_base"
 
   # URL-encode the query value (spaces etc.) with python.
+  # Append a cache-busting timestamp so the browser always fetches the current file.
+  CACHEBUST="$(date +%s)"
   ENCODED="$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" ".mdview-docs/$LINK_NAME")"
-  URL="http://localhost:$PORT/index.html?src=$ENCODED"
+  URL="http://localhost:$PORT/index.html?src=$ENCODED&t=$CACHEBUST"
 fi
 
 # Start the server if it isn't already running on this port. Detach it fully
